@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Penguin Species Classifier 🐧</title>
+
+  <!-- Load ONNX Runtime (specific version for stability) -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #eef3f7;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      color: #007acc;
+      margin-bottom: 10px;
+    }
+    .input-group {
+      margin: 10px;
+    }
+    input, select {
+      padding: 6px;
+      font-size: 1em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 150px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 25px;
+      font-size: 1em;
+      background-color: #007acc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005fa3;
+    }
+    #result {
+      font-size: 1.3em;
+      margin-top: 20px;
+      color: #333;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Penguin Species Classifier</h1>
+  <p>Enter penguin measurements to predict its species.</p>
+
+  <div id="inputs">
+    <div class="input-group">
+      <label>Bill Length (mm): </label>
+      <input id="bill_length_mm" type="number" step="0.1" />
+    </div>
+    <div class="input-group">
+      <label>Bill Depth (mm): </label>
+      <input id="bill_depth_mm" type="number" step="0.1" />
+    </div>
+    <div class="input-group">
+      <label>Flipper Length (mm): </label>
+      <input id="flipper_length_mm" type="number" />
+    </div>
+    <div class="input-group">
+      <label>Body Mass (g): </label>
+      <input id="body_mass_g" type="number" />
+    </div>
+    <div class="input-group">
+      <label>Island: </label>
+      <select id="island">
+        <option value="Biscoe">Biscoe</option>
+        <option value="Dream">Dream</option>
+        <option value="Torgersen">Torgersen</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label>Sex: </label>
+      <select id="sex">
+        <option value="MALE">MALE</option>
+        <option value="FEMALE">FEMALE</option>
+      </select>
+    </div>
+  </div>
+
+  <button onclick="predict()">Predict Species</button>
+  <div id="result"></div>
+
+  <script>
+    let session;
+
+    // Load the ONNX model
+    async function loadModel() {
+      try {
+        session = await ort.InferenceSession.create("./model.onnx");
+        console.log("✅ ONNX model loaded successfully");
+      } catch (err) {
+        console.error("❌ Failed to load ONNX model:", err);
+        alert("Error loading model.onnx. Make sure the file is uploaded and paths are correct.");
+      }
+    }
+
+    window.onload = loadModel;
+
+    // Perform prediction
+    async function predict() {
+      if (!session) {
+        alert("Model not loaded yet! Please wait a moment.");
+        return;
+      }
+
+      // Get user input
+      const bill_length = parseFloat(document.getElementById("bill_length_mm").value);
+      const bill_depth = parseFloat(document.getElementById("bill_depth_mm").value);
+      const flipper = parseFloat(document.getElementById("flipper_length_mm").value);
+      const body_mass = parseFloat(document.getElementById("body_mass_g").value);
+      const island = document.getElementById("island").value;
+      const sex = document.getElementById("sex").value;
+
+      // Validate inputs
+      if ([bill_length, bill_depth, flipper, body_mass].some(isNaN)) {
+        alert("Please enter all numeric values before predicting!");
+        return;
+      }
+
+      // One-hot encode categorical variables
+      const islands = ["Biscoe", "Dream", "Torgersen"];
+      const sexes = ["MALE", "FEMALE"];
+      const islandEnc = islands.map(i => (i === island ? 1 : 0));
+      const sexEnc = sexes.map(s => (s === sex ? 1 : 0));
+
+      // Combine all features (9 total)
+      const inputData = Float32Array.from([
+        bill_length,
+        bill_depth,
+        flipper,
+        body_mass,
+        ...islandEnc,
+        ...sexEnc
+      ]);
+
+      // Create tensor
+      const tensor = new ort.Tensor("float32", inputData, [1, inputData.length]);
+
+      try {
+        const output = await session.run({ input: tensor });
+        const predictions = output.output.data;
+
+        const classes = ["Adelie", "Chinstrap", "Gentoo"];
+        const predictedIndex = predictions.indexOf(Math.max(...predictions));
+        const predictedClass = classes[predictedIndex];
+
+        document.getElementById("result").innerHTML =
+          `Predicted Species: <b>${predictedClass}</b>`;
+      } catch (err) {
+        console.error("❌ Inference error:", err);
+        alert("Error running model inference. Check console for details.");
+      }
+    }
+  </script>
+</body>
+</html>
