@@ -97,7 +97,7 @@
     // Load the ONNX model
     async function loadModel() {
       try {
-        session = await ort.InferenceSession.create("./model.onnx");
+        session = await ort.InferenceSession.create("./penguins_model.onnx");
         console.log("✅ ONNX model loaded successfully");
       } catch (err) {
         console.error("❌ Failed to load ONNX model:", err);
@@ -165,3 +165,4 @@
   </script>
 </body>
 </html>
+
